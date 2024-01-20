@@ -10,8 +10,8 @@ int main(int argc, char** argv)
 
 	do
 	{
-		//draw a black rectangle to erase the old one
-		draw_rect(x, y, 20, 20, 0);
+		draw_text(210,210,"Press 'q' to exit.", 65535);
+		circle(x, y, 20, 15);
 
 		key = getkey();
 		if(key == 'w') y-=10;
