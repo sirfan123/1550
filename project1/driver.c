@@ -12,9 +12,9 @@ int main(int argc, char **argv)
 
 	do
 	{
-		draw_text(210, 20, "Press 'q' to exit.", RGB_TO_COLOR(31, 63, 31));
-		draw_text(210, 40, "Press 's' to draw square.", RGB_TO_COLOR(31, 0, 0));
-		draw_text(210, 60, "Press 'o' to draw circle.", RGB_TO_COLOR(0, 63, 0));
+		draw_text(210, 40, "Press 'q' to exit.", RGB_TO_COLOR(31, 63, 31));
+		draw_text(210, 60, "Press 's' to draw square.", RGB_TO_COLOR(31, 0, 0));
+		draw_text(210, 80, "Press 'o' to draw circle.", RGB_TO_COLOR(0, 63, 0));
 		// 	//draw_circle(x, y, 20, 15);
 
 		key = getkey();
@@ -29,8 +29,7 @@ int main(int argc, char **argv)
 		{ 
 			draw_circle(250, 140, 30, RGB_TO_COLOR(0, 63, 0));
 		}
-
-		sleep_ms(20);
+		sleep_ms(5000);
 	} while (key != 'q');
 
 	exit_graphics();

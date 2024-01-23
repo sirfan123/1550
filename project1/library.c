@@ -15,8 +15,8 @@ typedef unsigned short color_t;
 int fd;
 struct fb_var_screeninfo varInfo;
 struct fb_fix_screeninfo fixInfo;
-struct termios oldTermios;
-struct termios newTermios;
+struct termios oldTerminal;
+struct termios newTerminal;
 size_t mapSize;
 void *addy;
 
@@ -36,18 +36,18 @@ void init_graphics()
 	addy = mmap(NULL, mapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
 	// Disable canonical mode and keypress echo
-	ioctl(fd, TCGETS, &oldTermios);
-	newTermios = oldTermios;
-	newTermios.c_lflag &= ~ICANON;
-	newTermios.c_lflag &= ~ECHO;
-	ioctl(fd, TCSETS, &newTermios);
+	ioctl(STDIN_FILENO, TCGETS, &oldTerminal);//Store old terminal
+	newTerminal = oldTerminal;
+	newTerminal.c_lflag &= ~ICANON;
+	newTerminal.c_lflag &= ~ECHO;
+	ioctl(STDIN_FILENO, TCSETS, &newTerminal);//Set altered terminal
 }
 
 // Reenables canon and echo, then closes the map and file
 void exit_graphics()
 {
 
-	ioctl(fd, TCSETS, &oldTermios);
+	ioctl(STDIN_FILENO, TCSETS, &oldTerminal);//Reset to old terminal
 
 	munmap(addy, mapSize);
 	close(fd);
@@ -79,52 +79,36 @@ void sleep_ms(long ms)
 	time.tv_sec = 0;
 	time.tv_nsec = ms * 1000000;
 
-	if (nanosleep(&time, NULL) == -1)
-	{
-	}
+	nanosleep(&time, NULL) == -1;
+	 
+	 
 }
 
 // Draws a pixel at location x and y with a passed in color
 void draw_pixel(int x, int y, color_t color)
 {
-	unsigned short *pixel = (unsigned short *)addy;
-	int location;
-	location = x + (y * fixInfo.line_length);
-	*(pixel + location) = color;
+	unsigned short *pixel = (unsigned short *)addy;//uint16
+	int cordinates;
+	cordinates = x + (y * (fixInfo.line_length/2));
+	*(pixel + cordinates) = color;
 }
 
-void draw_rect(int x1, int y1, int width, int height, color_t c)
-{
-	int x = x1;
-	int y = y1;
+void draw_rect(int x1, int y1, int width, int height, color_t c) {
+    int x = x1;
+    int y = y1;
 
-	// Draw the top side of the rectangle
-	while (x <= x1 + width)
-	{
-		draw_pixel(x, y, c);
-		x++;
-	}
+    // Iterate through each row
+    while (y <= y1 + height) {
+        x = x1;
 
-	// Draw the right side of the rectangle
-	while (y <= y1 + height)
-	{
-		draw_pixel(x, y, c);
-		y++;
-	}
+        // Draw pixels in the current row
+        while (x <= x1 + width) {
+            draw_pixel(x, y, c);
+            x++;
+        }
 
-	// Draw the bottom side of the rectangle
-	while (x >= x1)
-	{
-		draw_pixel(x, y, c);
-		x--;
-	}
-
-	// Draw the left side of the rectangle
-	while (y >= y1)
-	{
-		draw_pixel(x, y, c);
-		y--;
-	}
+        y++;
+    }
 }
 
 void draw_text(int x, int y, const char *text, color_t c)
@@ -138,7 +122,7 @@ void draw_text(int x, int y, const char *text, color_t c)
 
 	while (textIndex != '\0')
 	{
-		ascii = (int)textIndex;
+		ascii = (int)textIndex;//Casting to int returns ascii code
 
 		for (i = 0; i < 16; i++)
 		{
