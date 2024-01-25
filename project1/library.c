@@ -1,6 +1,4 @@
 #include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/select.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
