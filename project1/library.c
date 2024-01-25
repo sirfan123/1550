@@ -24,7 +24,7 @@ void *addy;
 void init_graphics()
 {
 
-	// Opens the file representing first frame buffer
+	// Opens the file 
 	fd = open("/dev/fb0", O_RDWR);
 
 	// Find screen resolution and bit depth
@@ -32,10 +32,10 @@ void init_graphics()
 	ioctl(fd, FBIOGET_FSCREENINFO, &fixInfo);
 	mapSize = fixInfo.line_length * varInfo.yres_virtual;
 
-	// Writes to void * mmap
+	// Writes to void map
 	addy = mmap(NULL, mapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
-	// Disable canonical mode and keypress echo
+	// Disable canonical mode and  echo
 	ioctl(STDIN_FILENO, TCGETS, &oldTerminal);//Store old terminal
 	newTerminal = oldTerminal;
 	newTerminal.c_lflag &= ~ICANON;
@@ -43,7 +43,7 @@ void init_graphics()
 	ioctl(STDIN_FILENO, TCSETS, &newTerminal);//Set altered terminal
 }
 
-// Reenables canon and echo, then closes the map and file
+// Closes file
 void exit_graphics()
 {
 
@@ -57,15 +57,15 @@ void exit_graphics()
 char getkey()
 {
 	fd_set rfds;
-	int retval;
+	int retVal;
 	char buff = 0;
 	ssize_t retIn;
 	FD_ZERO(&rfds);
 	FD_SET(0, &rfds);
 
 	/*Calls select then read, so that the call isn't blocked*/
-	retval = select(1, &rfds, NULL, NULL, NULL);
-	if (retval != -1)
+	retVal = select(1, &rfds, NULL, NULL, NULL);
+	if (retVal != -1)
 	{
 		retIn = read(0, &buff, 1);
 	}
