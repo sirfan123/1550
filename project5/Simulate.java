@@ -96,14 +96,15 @@ public class Simulate {
           * hashtables.
           */
          int currentFrame = 0;
+         int counter2 = 0;
          br = new BufferedReader(new FileReader(traceFileName));
          while (br.ready()) {
             line = br.readLine();
             //This is 2 get past headers and rthe end of file
             if (line.startsWith("==")) {
                if(line.equals("==632==")){
-                  counter++;
-                  if (counter == 1){
+                  counter2++;
+                  if (counter2 == 1){
                      break;
                   }
                }
@@ -136,6 +137,7 @@ public class Simulate {
                      /**
                      * if (page frames is not full) swap in current page.
                      */
+                    System.out.println("(page fault – no eviction)");
                      pageFrames[currentFrame] = pageNumber;
                      pte.frame = currentFrame;
                      currentFrame++;
@@ -151,10 +153,10 @@ public class Simulate {
                      * If (swapped out page is dirty) increment the write to disk number.
                      */
                      if(t_pte.dirty) {
-                        System.out.println(parts[0]+" (page fault – evict dirty)");
+                        System.out.println(" (page fault – evict dirty)");
                         totalWritesToDisk++;
                      } else {
-                        System.out.println(parts[0]+" (page fault – evict clean)");
+                        System.out.println(" (page fault – evict clean)");
                      }
                      /**
                      * evict/swap out page.
@@ -187,6 +189,7 @@ public class Simulate {
                      /**
                      * if (page frames is not full) swap in current page.
                      */
+                    System.out.println(" (page fault – no eviction)");
                      pageFrames[currentFrame] = pageNumber;
                      pte.frame = currentFrame;
                      currentFrame++;
@@ -203,10 +206,10 @@ public class Simulate {
                      * If (swapped out page is dirty) increment the write to disk number.
                      */
                      if(t_pte.dirty) {
-                        System.out.println(parts[0]+" (page fault – evict dirty)");
+                        System.out.println(" (page fault – evict dirty)");
                         totalWritesToDisk++;
                      } else {
-                        System.out.println(parts[0]+" (page fault – evict clean)");
+                        System.out.println(" (page fault – evict clean)");
                      }
                      /**
                      * evict/swap out page.
@@ -234,7 +237,7 @@ public class Simulate {
                      /**
                      * if (page frames is not full) swap in current page.
                      */
-                     
+                    System.out.println(" (page fault – no eviction)");
                      pageFrames[currentFrame] = pageNumber;
                      pte.frame = currentFrame;
                      currentFrame++;
@@ -250,10 +253,10 @@ public class Simulate {
                      * If (swapped out page is dirty) increment the write to disk number.
                      */
                      if(t_pte.dirty) {
-                        System.out.println(parts[0]+" (page fault – evict dirty)");
+                        System.out.println(" (page fault – evict dirty)");
                         totalWritesToDisk++;
                      } else {
-                        System.out.println(parts[0]+" (page fault – evict clean)");
+                        System.out.println(" (page fault – evict clean)");
                      }
                      /**
                      * evict/swap out page.
@@ -372,6 +375,8 @@ public class Simulate {
                      /**
                      * if (page frames is not full) swap in current page.
                      */
+                    System.out.println(" (page fault – no eviction)");
+                  
                      pageFrames[currentFrame] = pageNumber;
                      pte.frame = currentFrame;
                      currentFrame++;
@@ -410,10 +415,10 @@ public class Simulate {
                      /**
                       * If (swapped out page is dirty) increment the write to disk number;
                       */
-                     System.out.println(parts[0] + " (page fault – evict dirty)");
+                     System.out.println(" (page fault – evict dirty)");
                      totalWritesToDisk++;
                   } else {
-                     System.out.println(parts[0] + " (page fault – evict clean)");
+                     System.out.println(" (page fault – evict clean)");
                   }
                   /**
                    * evict/swap out page.
@@ -446,6 +451,8 @@ public class Simulate {
                      /**
                      * if (page frames is not full) swap in current page.
                      */
+                    System.out.println(" (page fault – no eviction)");
+                   
                      pageFrames[currentFrame] = pageNumber;
                      pte.frame = currentFrame;
                      currentFrame++;
@@ -484,10 +491,10 @@ public class Simulate {
                      /**
                       * If (swapped out page is dirty) increment the write to disk number;
                       */
-                     System.out.println(parts[0] + " (page fault – evict dirty)");
+                     System.out.println(" (page fault – evict dirty)");
                      totalWritesToDisk++;
                   } else {
-                     System.out.println(parts[0] + " (page fault – evict clean)");
+                     System.out.println(" (page fault – evict clean)");
                   }
                   /**
                    * evict/swap out page.
@@ -515,6 +522,8 @@ public class Simulate {
                      /**
                      * if (page frames is not full) swap in current page.
                      */
+                    System.out.println(" (page fault – no eviction)");
+                    
                      pageFrames[currentFrame] = pageNumber;
                      pte.frame = currentFrame;
                      currentFrame++;
@@ -553,10 +562,10 @@ public class Simulate {
                      /**
                       * If (swapped out page is dirty) increment the write to disk number;
                       */
-                     System.out.println(parts[0] + " (page fault – evict dirty)");
+                     System.out.println(" (page fault – evict dirty)");
                      totalWritesToDisk++;
                   } else {
-                     System.out.println(parts[0] + " (page fault – evict clean)");
+                     System.out.println(" (page fault – evict clean)");
                   }
                   /**
                    * evict/swap out page.

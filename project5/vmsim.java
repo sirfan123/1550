@@ -46,7 +46,7 @@ public class vmsim {
  
     public static void printErrorMsg() {
        System.out.println("Incorrect usage of the command-line parameters. Please enter one of the following:");
-       System.out.println("java vmsim –n <numframes> -a <opt> <tracefile>");
+       System.out.println("java vmsim -n <numframes> -a <opt> <tracefile>");
        System.out.println("java vmsim –n <numframes> -a <clock> <tracefile>");
        System.out.println("java vmsim –n <numframes> -a <nru> -r <refresh> <tracefile>");
        System.out.println("java vmsim –n <numframes> -a <work> -r <refresh> -t <tau> <tracefile>");
