@@ -1,0 +1,13 @@
+# Writeup Samih Irfan
+
+In this analysis, we compared the performance of threaded and multiprocess servers for serving a set of files concurrently. For my testing I had 5 unique files all different sizes. I used wget on all 5 files at once within each respective server and gathered my results. The largest file exhibited faster processing on the multiprocess server, while the 4 smaller files ran quicker on the threaded server in my testing. The multiprocess server was faster but only by a little bit however I believe if the file was bigger the difference would be more noticeable. 
+
+For the smaller files, the threaded server outperformed the multiprocess server. This is likely due to the lightweight nature of threads, which incur less overhead compared to processes. Threads share memory space within the same process, enabling faster communication and synchronization. Consequently, the threaded server excelled in handling concurrent requests for smaller files with less computational intensity.
+
+Conversely, the multiprocess server demonstrated superior performance for the largest file. Multiprocess servers leverage true parallelism by executing tasks across multiple independent processes, each utilizing separate CPU cores. This approach is beneficial for CPU-bound tasks and heavy computational workloads, as seen with the larger file, where parallel processing can lead to faster execution times. As I already mentioned the file was not signifigantly bigger than the 4 other files however it was faster on the multiprocess server. In theory then the bigger the file the faster this server will perform.
+
+The observed differences in performance highlight the trade-offs between threaded and multiprocess architectures. While threaded servers offer efficiency and agility for handling concurrent I/O-bound tasks, multiprocess servers excel in CPU-bound scenarios requiring intensive computation.
+
+Additionally, in a cached server scenario based on the threaded architecture, initial file loading from disk incurred higher latency due to cache checks and synchronization overhead. However, subsequent access to cached files exhibited significantly improved performance, showcasing the efficiency of caching mechanisms in reducing response times for frequently accessed resources.
+
+In conclusion, the choice between threaded and multiprocess servers depends on workload characteristics and performance requirements. Understanding the strengths and limitations of each concurrency model is essential for optimizing server performance and scalability in diverse application scenarios.
