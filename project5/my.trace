@@ -1,0 +1,19 @@
+==632== Lackey, an example Valgrind tool
+==632== Copyright (C) 2002-2017, and GNU GPL'd, by Nicholas Nethercote.
+==632== Using Valgrind-3.16.1 and LibVEX; rerun with -h for copyright info
+==632== Command: ls
+==632== Parent PID: 359
+==632== 
+I  00000000,2
+I  10000000,3
+I  20000000,1
+I  30000000,4
+I  40000000,4
+I  50000000.4
+I  60000000,4
+I  70000000,4
+ S 70000000,4
+I  70000000,4
+I  80000000,4
+ M 90000000,4
+==632==

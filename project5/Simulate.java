@@ -1,29 +1,14 @@
 
 import java.io.BufferedReader;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
-import java.io.IOException;
 import java.util.Hashtable;
 import java.util.LinkedList;
-import java.util.Map;
-import java.util.Queue;
 
 public class Simulate {
 
-   /**
-    * Simulate class constructor.
-    */
-   public Simulate() {
-
-   }
-
    public final int PAGE_SIZE = 2048; // 2 KB
 
-   // Initialize page frames //S MEANS DIRTY BIT and VALID NEEDS TO BE SET 2 ONE
-   // M IS JUST A L AND THEN A STORE
-   // I AND L make invalid page valid and make it valid but if alrdy valid its a
-   // hit and set refrenced
-   // Just chop bottom 11 bits off index[2] my hex
+   // Opt
    public void opt(int nFrames, String traceFileName) {
       int totalMemAccesses = 0;
       int totalPageFaults = 0;
@@ -32,38 +17,32 @@ public class Simulate {
       char accessType = ' '; // Load (L), Store (S), Modify (M)
       int[] pageFrames = new int[nFrames];
       Hashtable<Integer, PageTableEntry> pageTable = new Hashtable<>();
-      Hashtable<Integer, LinkedList<Integer>> future = new Hashtable<>();
-      BufferedReader br = null;
+      Hashtable<Integer, LinkedList<Integer>> futureMap = new Hashtable<>(); // Linked list or I guess i could have used
+      // ArrayList to dynamically allocate this
+      // instead of setting them all to max size
+      BufferedReader r = null;
       String line = "";
       // Read and parse the trace file
       try {
-         System.out.println("Initializing page table...");
-         for (int i = 0; i < 1024 * 1024; i++) {
+        //Need to init pageTable and futureMap to correct size
+         for (int i = 0; i < 2097152; i++) { // 32 bit address space / 2KB pageSize = # of pages
             // Initialize the page table & future hashtables.
             PageTableEntry pte = new PageTableEntry();
             pageTable.put(i, pte);
-            future.put(i, new LinkedList<Integer>());
+            futureMap.put(i, new LinkedList<Integer>());
          }
          // Initialize the page_frames array.
          for (int i = 0; i < nFrames; i++) {
             pageFrames[i] = -1;
          }
 
-         /**
-          * Pre-process the future hashtable before the opt algorithm is executed.
-          *
-          * Build a Hashtable (future) where <key> is each page’s index and
-          * <value> records all that page’s locations in ascending
-          * order according to the given trace file. This is done by
-          * only traversing the whole trace file once initially.
-          * Assign a pointer to each page at the current location.
-          */
-         br = new BufferedReader(new FileReader(traceFileName));
+         // We need to set futureTable  we can do opt after this
+         r = new BufferedReader(new FileReader(traceFileName));
          int counter = 0;
-         int line_count = 0;
+         int lineCount = 0;
 
-         while (br.ready()) {
-            line = br.readLine();
+         while (r.ready()) {
+            line = r.readLine();
             // This is 2 get past headers and the end of file
             if (line.startsWith("==")) {
                if (line.equals("==632==")) {
@@ -75,31 +54,15 @@ public class Simulate {
                continue; // Skip empty lines and header lines
             }
             String[] parts = line.split(" ");
-            // System.out.println("Parted string:");
-            // for (int j = 0; j < parts.length; j++) {
-            // System.out.println("Index " + j + ": " + parts[j]);
-            // }
             int pageNumber = Integer.decode("0x" + parts[2].substring(0, 5));
-            // System.out.println("pageNumber: " + pageNumber);
-            future.get(pageNumber).add(line_count);
-            line_count++;
+            futureMap.get(pageNumber).add(lineCount); // Add the line count everytime a pageNum is refrenced
+            lineCount++;
          }
-         // System.out.println("CHECKING FUTURE");
-         // for (Map.Entry<Integer, LinkedList<Integer>> entry : future.entrySet()) {
-         // Integer key = entry.getKey();
-         // LinkedList<Integer> value = entry.getValue();
-         // System.out.println("Page number: " + key);
-         // System.out.println("Locations: " + value);
-         // }
-         /**
-          * Start executing the optimal page replacement algorithm using the two
-          * hashtables.
-          */
          int currentFrame = 0;
          int counter2 = 0;
-         br = new BufferedReader(new FileReader(traceFileName));
-         while (br.ready()) {
-            line = br.readLine();
+         r = new BufferedReader(new FileReader(traceFileName));
+         while (r.ready()) { // Can do opt now
+            line = r.readLine();
             // This is 2 get past headers and rthe end of file
             if (line.startsWith("==")) {
                if (line.equals("==632==")) {
@@ -110,7 +73,7 @@ public class Simulate {
                }
                continue; // Skip empty lines and header lines
             }
-
+            // Parse the line
             String[] parts = line.split(" ");
             if (!parts[1].isEmpty()) {
                accessType = parts[1].charAt(0); // Load (L), Store (S), Modify (M)
@@ -121,53 +84,71 @@ public class Simulate {
 
             // Convert hex to decimal page number
             int pageNumber = Integer.decode("0x" + parts[2].substring(0, 5));
-            future.get(pageNumber).removeFirst();
+
+            futureMap.get(pageNumber).removeFirst();
             PageTableEntry pte = pageTable.get(pageNumber);
             pte.index = pageNumber;
-            // pte.referenced = true; //I forgot in what condition refrence is initalized to
-            // true and then we can set again
+            pte.referenced = true; // Always set ref to true
 
-            // Initialize page frames //S MEANS DIRTY BIT and VALID NEEDS TO BE SET 2 ONE
-            // M IS JUST A L AND THEN A STORE
-            // I AND L make invalid page valid and make it pagefault but if alrdy valid its
-            // a
-
-            // hit and set refrenced
+            // If valid hit else set it to valid and pagefault
             if (instructionType == 'I') {
                if (!pte.valid) {
                   totalPageFaults++;
                   pte.valid = true;
-                  if (currentFrame < nFrames) {
-                     /**
-                      * if (page frames is not full) swap in current page.
-                      */
+                  if (currentFrame < nFrames) { // If we have room
                      System.out.println("(page fault – no eviction)");
                      pageFrames[currentFrame] = pageNumber;
                      pte.frame = currentFrame;
                      currentFrame++;
-                  } else {// IDK BOUT THIS ELSE
-                     /**
-                      * if page_frames is full locate the page with the longest distance
-                      * from current page and evict it based on the opt algorithm.
-                      */
-                     int longestDistance = locateLongestDistancePage(pageFrames, future);
+                  } else { // No room eviction algo
+                     int longestDistance = locateLongestDistancePage(pageFrames, futureMap);
+                     PageTableEntry tPte = pageTable.get(longestDistance); // Page to kick based on longest distance
+
+                     if (tPte.dirty) {
+                        System.out.println("(page fault – evict dirty)");
+                        totalWritesToDisk++;
+                     } else {
+                        System.out.println("(page fault – evict clean)");
+                     }
+                     // Swap out the page
+                     pageFrames[tPte.frame] = pte.index;
+                     pte.frame = tPte.frame;
+                     pte.valid = true;
+                     tPte.dirty = false;
+                     tPte.referenced = false;
+                     tPte.valid = false;
+                     tPte.frame = -1;
+                     pageTable.put(longestDistance, tPte);
+                  }
+               } else {
+                  System.out.println("HIT");
+               }
+            }
+            // S means dirty bit needs to be true and valid if not already a valid hit
+            if (instructionType == 'S') {
+               pte.dirty = true; // Dirty since its a store
+               if (!pte.valid) { // if its not valid pagefault and make it valid
+                  totalPageFaults++;
+                  pte.valid = true;
+
+                  if (currentFrame < nFrames) { // if we have room
+                     System.out.println("(page fault – no eviction)");
+                     pageFrames[currentFrame] = pageNumber;
+                     pte.frame = currentFrame;
+                     currentFrame++;
+                  } else { // Else run the eviction algo
+                     int longestDistance = locateLongestDistancePage(pageFrames, futureMap);
                      PageTableEntry t_pte = pageTable.get(longestDistance);
-                     /**
-                      * If (swapped out page is dirty) increment the write to disk number. (shouldnt
-                      * it be clean kicked)
-                      */
+
                      if (t_pte.dirty) {
                         System.out.println("(page fault – evict dirty)");
                         totalWritesToDisk++;
                      } else {
                         System.out.println("(page fault – evict clean)");
                      }
-                     /**
-                      * evict/swap out page.
-                      */
+
                      pageFrames[t_pte.frame] = pte.index;
                      pte.frame = t_pte.frame;
-                     pte.valid = true;
                      t_pte.dirty = false;
                      t_pte.referenced = false;
                      t_pte.valid = false;
@@ -176,50 +157,34 @@ public class Simulate {
                   }
                } else {
                   System.out.println("HIT");
-                  pte.referenced = true;
                }
             }
-
-            if (accessType == 'S') {
-               pte.dirty = true;
-               pte.valid = true;
-            }
-
-            if (accessType == 'L') {
+            if (accessType == 'L') { // Same as I
                if (!pte.valid) {
                   totalPageFaults++;
                   pte.valid = true;
                   if (currentFrame < nFrames) {
-                     /**
-                      * if (page frames is not full) swap in current page.
-                      */
+
                      System.out.println("(page fault – no eviction)");
                      pageFrames[currentFrame] = pageNumber;
                      pte.frame = currentFrame;
                      currentFrame++;
 
-                  } else {// IDK BOUT THIS ELSE
-                     /**
-                      * if page_frames is full locate the page with the longest distance
-                      * from current page and evict it based on the opt algorithm.
-                      */
-                     int longestDistance = locateLongestDistancePage(pageFrames, future);
+                  } else {
+
+                     int longestDistance = locateLongestDistancePage(pageFrames, futureMap);
                      PageTableEntry t_pte = pageTable.get(longestDistance);
-                     /**
-                      * If (swapped out page is dirty) increment the write to disk number.
-                      */
+
                      if (t_pte.dirty) {
                         System.out.println("(page fault – evict dirty)");
                         totalWritesToDisk++;
                      } else {
                         System.out.println("(page fault – evict clean)");
                      }
-                     /**
-                      * evict/swap out page.
-                      */
+
                      pageFrames[t_pte.frame] = pte.index;
                      pte.frame = t_pte.frame;
-                     pte.valid = true;
+                     // pte.valid = true;
                      t_pte.dirty = false;
                      t_pte.referenced = false;
                      t_pte.valid = false;
@@ -228,44 +193,35 @@ public class Simulate {
                   }
                } else {
                   System.out.println("HIT");
-                  pte.referenced = true;
                }
             }
 
-            if (accessType == 'M') {
-               if (!pte.valid) { // A load
+            if (accessType == 'M') { // M is a L followed by S
+               // Load
+               if (!pte.valid) {
                   totalPageFaults++;
                   pte.valid = true;
                   if (currentFrame < nFrames) {
-                     /**
-                      * if (page frames is not full) swap in current page.
-                      */
+
                      System.out.println("(page fault – no eviction)");
                      pageFrames[currentFrame] = pageNumber;
                      pte.frame = currentFrame;
                      currentFrame++;
-                  } else {// IDK BOUT THIS ELSE
-                     /**
-                      * if page_frames is full locate the page with the longest distance
-                      * from current page and evict it based on the opt algorithm.
-                      */
-                     int longestDistance = locateLongestDistancePage(pageFrames, future);
+                  } else {
+
+                     int longestDistance = locateLongestDistancePage(pageFrames, futureMap);
                      PageTableEntry t_pte = pageTable.get(longestDistance);
-                     /**
-                      * If (swapped out page is dirty) increment the write to disk number.
-                      */
+
                      if (t_pte.dirty) {
                         System.out.println("(page fault – evict dirty)");
                         totalWritesToDisk++;
                      } else {
                         System.out.println("(page fault – evict clean)");
                      }
-                     /**
-                      * evict/swap out page.
-                      */
+
                      pageFrames[t_pte.frame] = pte.index;
                      pte.frame = t_pte.frame;
-                     pte.valid = true;
+                     // pte.valid = true;
                      t_pte.dirty = false;
                      t_pte.referenced = false;
                      t_pte.valid = false;
@@ -274,16 +230,22 @@ public class Simulate {
                   }
                } else {
                   System.out.println("HIT");
-                  pte.referenced = true;
                }
+               // Store
                pte.dirty = true;
-               pte.valid = true; // Followed by a store
+               pte.valid = true;
+               // Mem access since we did load and store
+               totalMemAccesses++;
             }
             pageTable.put(pageNumber, pte);// update pageTable in the end
-            totalMemAccesses++;
+            totalMemAccesses++;// Mem Access
          }
 
-         printStatistics("Opt", nFrames, totalMemAccesses, totalPageFaults, totalWritesToDisk);
+         System.out.println("Algorithm: OPT");
+         System.out.println("Number of frames:\t" + nFrames);
+         System.out.println("Total memory accesses:\t" + totalMemAccesses);
+         System.out.println("Total page faults:\t" + totalPageFaults);
+         System.out.println("Total writes to disk:\t" + totalWritesToDisk);
       } catch (Exception e) {
          e.printStackTrace();
 
@@ -291,19 +253,16 @@ public class Simulate {
 
    }
 
-   /**
-    * we already know the distances of all pages in our page frames.
-    * now we need to locate the page with the longest distance to evict
-    * given the future hashtable and the frames.
-    */
-   private static int locateLongestDistancePage(int[] page_frames, Hashtable<Integer, LinkedList<Integer>> future) {
-      int index = 0, max = 0;
+  //We alrdy know the future so we just locate the furthest from use page
+   private static int locateLongestDistancePage(int[] page_frames, Hashtable<Integer, LinkedList<Integer>> futureMap) {
+      int index = 0;
+      int max = 0;
       for (int i = 0; i < page_frames.length; i++) {
-         if (future.get(page_frames[i]).isEmpty()) {
+         if (futureMap.get(page_frames[i]).isEmpty()) {
             return page_frames[i];
          } else {
-            if (future.get(page_frames[i]).get(0) > max) {
-               max = future.get(page_frames[i]).get(0);
+            if (futureMap.get(page_frames[i]).get(0) > max) { 
+               max = futureMap.get(page_frames[i]).get(0);
                index = page_frames[i];
             }
          }
@@ -311,9 +270,7 @@ public class Simulate {
       return index;
    }
 
-   /****************************************************************************************************
-    *************************** The Clock page replacement algorithm. ***********************************
-    ****************************************************************************************************/
+   // Clock
    public void clock(int nFrames, String traceFileName) {
       int totalMemAccesses = 0;
       int totalPageFaults = 0;
@@ -323,11 +280,10 @@ public class Simulate {
       char accessType = ' '; // Load (L), Store (S), Modify (M)
       Hashtable<Integer, PageTableEntry> pageTable = new Hashtable<Integer, PageTableEntry>();
       int[] pageFrames = new int[nFrames];
-      BufferedReader br = null;
+      BufferedReader r = null;
       String line = " ";
-      try {
-         System.out.println("Initializing page table...");
-         for (int i = 0; i < 1024 * 1024; i++) {
+      try { // Initilize page table to #pages
+         for (int i = 0; i < 2097152; i++) {
             PageTableEntry pte = new PageTableEntry();
             pageTable.put(i, pte);
          }
@@ -341,9 +297,9 @@ public class Simulate {
           */
          int currentFrame = 0;
          int counter = 0;
-         br = new BufferedReader(new FileReader(traceFileName));
-         while (br.ready()) {
-            line = br.readLine();
+         r = new BufferedReader(new FileReader(traceFileName));
+         while (r.ready()) {
+            line = r.readLine();
             // This is 2 get past headers and rthe end of file
             if (line.startsWith("==")) {
                if (line.equals("==632==")) {
@@ -354,9 +310,7 @@ public class Simulate {
                }
                continue; // Skip empty lines and header lines
             }
-            /**
-             * swap in the page to be visited.
-             */
+
             String[] parts = line.split(" ");
             if (!parts[1].isEmpty()) {
                accessType = parts[1].charAt(0); // Load (L), Store (S), Modify (M)
@@ -367,67 +321,62 @@ public class Simulate {
 
             // Convert hex to decimal page number
             int pageNumber = Integer.decode("0x" + parts[2].substring(0, 5));
+
             PageTableEntry pte = pageTable.get(pageNumber);
             pte.index = pageNumber;
-            //pte.referenced = true;
-            if (instructionType == 'I') {
+            pte.referenced = true; // We always refrence
+
+            if (instructionType == 'I') { // If valid hit else make valid we page faulted
                if (!pte.valid) {
                   totalPageFaults++;
                   pte.valid = true;
-                  if (currentFrame < nFrames) {
-                     /**
-                      * if (page frames is not full) swap in current page.
-                      */
+                  if (currentFrame < nFrames) { // If we have room
+
                      System.out.println("(page fault – no eviction)");
 
                      pageFrames[currentFrame] = pageNumber;
                      pte.frame = currentFrame;
                      currentFrame++;
                   } else {
-                     /**
-                      * if page_frames is full evict one page depending on the clock algorithm.
-                      */
+                     // Clock algo
                      int page_num_to_evict = 0;
 
                      boolean found_flag = false;
-                     while (found_flag == false) {
+                     while (found_flag == false) { // While page is ref keep looking
                         if (clockHandPos == pageFrames.length || clockHandPos < 0) {
                            clockHandPos = 0;
                         }
                         if (!pageTable.get(pageFrames[clockHandPos]).referenced) {
-                           /**
-                            * if the reference bit = 0 stop the search and evict the page.
-                            */
+
+                           // If ref == false found page to evict
+
                            page_num_to_evict = pageFrames[clockHandPos];
                            found_flag = true;
                         } else {
-                           /**
-                            * if the reference bit = 1 clear the reference bit.
-                            */
+
+                           // if the reference bit is 1 clear it
+
                            pageTable.get(pageFrames[clockHandPos]).referenced = false;
                         }
-                        /**
-                         * advance clock hand.
-                         */
+
+                        // Increment clock 
+
                         clockHandPos++;
                      }
 
                      PageTableEntry t_pte = pageTable.get(page_num_to_evict);
                      if (t_pte.dirty) {
-                        /**
-                         * If (swapped out page is dirty) increment the write to disk number;
-                         */
+
+                        // If (swapped out page is dirty) increment the write to disk number;
+
                         System.out.println("(page fault – evict dirty)");
                         totalWritesToDisk++;
                      } else {
                         System.out.println("(page fault – evict clean)");
                      }
-                     /**
-                      * evict/swap out page.
-                      */
+                     // swap
                      pageFrames[t_pte.frame] = pte.index;
                      pte.frame = t_pte.frame;
-                     pte.valid = true;
                      t_pte.dirty = false;
                      t_pte.referenced = true;
                      t_pte.valid = false;
@@ -436,32 +385,23 @@ public class Simulate {
                   }
                } else {
                   System.out.println("HIT");
-                  pte.referenced = true;
                }
             }
-
-            if (accessType == 'S') {
-               pte.dirty = true;
-               pte.valid = true;
-            }
-
-            if (instructionType == 'L') {
-               if (!pte.valid) {
+            // S means dirty bit needs to be true and valid if not already a valid hit
+            if (instructionType == 'S') {
+               pte.dirty = true;// Dirty == true because S
+               if (!pte.valid) { // If not valid pagefault and make valid else hit
                   totalPageFaults++;
                   pte.valid = true;
-                  if (currentFrame < nFrames) {
-                     /**
-                      * if (page frames is not full) swap in current page.
-                      */
+                  if (currentFrame < nFrames) {// If room
+
                      System.out.println("(page fault – no eviction)");
 
                      pageFrames[currentFrame] = pageNumber;
                      pte.frame = currentFrame;
                      currentFrame++;
                   } else {
-                     /**
-                      * if page_frames is full evict one page depending on the clock algorithm.
-                      */
+                     // Clock algo
                      int page_num_to_evict = 0;
 
                      boolean found_flag = false;
@@ -470,20 +410,68 @@ public class Simulate {
                            clockHandPos = 0;
                         }
                         if (!pageTable.get(pageFrames[clockHandPos]).referenced) {
-                           /**
-                            * if the reference bit = 0 stop the search and evict the page.
-                            */
+
                            page_num_to_evict = pageFrames[clockHandPos];
                            found_flag = true;
                         } else {
-                           /**
-                            * if the reference bit = 1 clear the reference bit.
-                            */
+
                            pageTable.get(pageFrames[clockHandPos]).referenced = false;
                         }
-                        /**
-                         * advance clock hand.
-                         */
+
+                        clockHandPos++;
+                     }
+
+                     PageTableEntry t_pte = pageTable.get(page_num_to_evict);
+                     if (t_pte.dirty) {
+
+                        System.out.println("(page fault – evict dirty)");
+                        totalWritesToDisk++;
+                     } else {
+                        System.out.println("(page fault – evict clean)");
+                     }
+                     // swap
+                     pageFrames[t_pte.frame] = pte.index;
+                     pte.frame = t_pte.frame;
+                     // pte.valid = true;
+                     t_pte.dirty = false;
+                     t_pte.referenced = true;
+                     t_pte.valid = false;
+                     t_pte.frame = -1;
+                     pageTable.put(page_num_to_evict, t_pte);
+                  }
+               } else {
+                  System.out.println("HIT");
+               }
+            }
+            if (accessType == 'L') { // Same as I
+               if (!pte.valid) {
+                  totalPageFaults++;
+                  pte.valid = true;
+                  if (currentFrame < nFrames) {
+
+                     System.out.println("(page fault – no eviction)");
+
+                     pageFrames[currentFrame] = pageNumber;
+                     pte.frame = currentFrame;
+                     currentFrame++;
+                  } else {
+
+                     int page_num_to_evict = 0;
+
+                     boolean found_flag = false;
+                     while (found_flag == false) {
+                        if (clockHandPos == pageFrames.length || clockHandPos < 0) {
+                           clockHandPos = 0;
+                        }
+                        if (!pageTable.get(pageFrames[clockHandPos]).referenced) {
+
+                           page_num_to_evict = pageFrames[clockHandPos];
+                           found_flag = true;
+                        } else {
+
+                           pageTable.get(pageFrames[clockHandPos]).referenced = false;
+                        }
+
                         clockHandPos++;
                      }
 
@@ -497,12 +485,9 @@ public class Simulate {
                      } else {
                         System.out.println("(page fault – evict clean)");
                      }
-                     /**
-                      * evict/swap out page.
-                      */
+                     // Swap
                      pageFrames[t_pte.frame] = pte.index;
                      pte.frame = t_pte.frame;
-                     pte.valid = true;
                      t_pte.dirty = false;
                      t_pte.referenced = false;
                      t_pte.valid = false;
@@ -511,27 +496,22 @@ public class Simulate {
                   }
                } else {
                   System.out.println("HIT");
-                  pte.referenced = true;
                }
             }
 
-            if (instructionType == 'M') {
+            if (accessType == 'M') { // L and then a S
                if (!pte.valid) {
                   totalPageFaults++;
                   pte.valid = true;
                   if (currentFrame < nFrames) {
-                     /**
-                      * if (page frames is not full) swap in current page.
-                      */
+
                      System.out.println("(page fault – no eviction)");
 
                      pageFrames[currentFrame] = pageNumber;
                      pte.frame = currentFrame;
                      currentFrame++;
                   } else {
-                     /**
-                      * if page_frames is full evict one page depending on the clock algorithm.
-                      */
+
                      int page_num_to_evict = 0;
 
                      boolean found_flag = false;
@@ -540,39 +520,28 @@ public class Simulate {
                            clockHandPos = 0;
                         }
                         if (!pageTable.get(pageFrames[clockHandPos]).referenced) {
-                           /**
-                            * if the reference bit = 0 stop the search and evict the page.
-                            */
+
                            page_num_to_evict = pageFrames[clockHandPos];
                            found_flag = true;
                         } else {
-                           /**
-                            * if the reference bit = 1 clear the reference bit.
-                            */
+
                            pageTable.get(pageFrames[clockHandPos]).referenced = false;
                         }
-                        /**
-                         * advance clock hand.
-                         */
+
                         clockHandPos++;
                      }
 
                      PageTableEntry t_pte = pageTable.get(page_num_to_evict);
                      if (t_pte.dirty) {
-                        /**
-                         * If (swapped out page is dirty) increment the write to disk number;
-                         */
+
                         System.out.println("(page fault – evict dirty)");
                         totalWritesToDisk++;
                      } else {
                         System.out.println("(page fault – evict clean)");
                      }
-                     /**
-                      * evict/swap out page.
-                      */
+
                      pageFrames[t_pte.frame] = pte.index;
                      pte.frame = t_pte.frame;
-                     pte.valid = true;
                      t_pte.dirty = false;
                      t_pte.referenced = false;
                      t_pte.valid = false;
@@ -581,27 +550,29 @@ public class Simulate {
                   }
                } else {
                   System.out.println("HIT");
-                  pte.referenced = true;
                }
                pte.dirty = true;
                pte.valid = true;
+               totalMemAccesses++;
             }
-
+            //Put the new entry in pageTable and ++ memAccess for each line
             pageTable.put(pageNumber, pte);
             totalMemAccesses++;
          }
          /**
           * Print statistics.
           */
-         printStatistics("Clock", nFrames, totalMemAccesses, totalPageFaults, totalWritesToDisk);
+         System.out.println("Algorithm: CLOCK");
+         System.out.println("Number of frames:\t" + nFrames);
+         System.out.println("Total memory accesses:\t" + totalMemAccesses);
+         System.out.println("Total page faults:\t" + totalPageFaults);
+         System.out.println("Total writes to disk:\t" + totalWritesToDisk);
       } catch (Exception e) {
          e.printStackTrace();
       }
    }
 
-   /****************************************************************************************************
-    *********************** The Not Recently Used (NRU) page replacement algorithm.. ********************
-    ****************************************************************************************************/
+   // NRU
    public void nru(int nFrames, int refresh, String traceFileName) {
       int totalMemAccesses = 0;
       int totalPageFaults = 0;
@@ -610,10 +581,10 @@ public class Simulate {
       char accessType = ' '; // Load (L), Store (S), Modify (M)
       Hashtable<Integer, PageTableEntry> pageTable = new Hashtable<Integer, PageTableEntry>();
       int[] pageFrames = new int[nFrames];
-      BufferedReader br = null;
+      BufferedReader r = null;
       try {
          System.out.println("Initializing page table...");
-         for (int i = 0; i < 1024 * 1024; i++) {
+         for (int i = 0; i < 2097152; i++) {
             PageTableEntry pte = new PageTableEntry();
             pageTable.put(i, pte);
          }
@@ -628,11 +599,9 @@ public class Simulate {
          int currentFrame = 0;
          String line = " ";
          int counter = 0;
-         br = new BufferedReader(new FileReader(traceFileName));
-         while (br.ready()) {
-            line = br.readLine();
-           // System.out.println("Here is the line:" + line + "and here is counter: "+ counter);
-            // This is 2 get past headers and the end of file
+         r = new BufferedReader(new FileReader(traceFileName));
+         while (r.ready()) {
+            line = r.readLine();
             if (line.startsWith("==")) {
                if (line.equals("==632==")) {
                   counter++;
@@ -642,11 +611,7 @@ public class Simulate {
                }
                continue; // Skip empty lines and header lines
             }
-            /**
-             * On each clock interrupt clear the reference bit, and
-             * update the page table, to distinguish pages that have
-             * not been referenced recently from those that have been.
-             */
+            // We can just reset ref right at the start same idea
             if (totalMemAccesses % refresh == 0) {
                for (int i = 0; i < currentFrame; i++) {
                   PageTableEntry pte = pageTable.get(pageFrames[i]);
@@ -654,85 +619,74 @@ public class Simulate {
                   pageTable.put(pte.index, pte);
                }
             }
-            /**
-             * swap in the page to be visited.
-             */
+
             String[] parts = line.split(" ");
             int pageNumber = Integer.decode("0x" + parts[2].substring(0, 5));
             PageTableEntry pte = pageTable.get(pageNumber);
+
             if (!parts[1].isEmpty()) {
                accessType = parts[1].charAt(0); // Load (L), Store (S), Modify (M)
+
             }
             if (!parts[0].isEmpty()) {
                instructionType = parts[0].charAt(0); // I
             }
 
             pte.index = pageNumber;
-            //pte.referenced = true;
-            if (instructionType == 'I') {
+            pte.referenced = true;// We always set ref since pte has been ref
+            if (instructionType == 'I') { // If I and valid hit else page fault and set valid
                if (!pte.valid) {
                   totalPageFaults++;
                   pte.valid = true;
-                  if (currentFrame < nFrames) {
-                     /**
-                      * if (page frames is not full) swap in current page.
-                      */
+                  if (currentFrame < nFrames) {// if we have room
+
                      System.out.println("(page fault – no eviction)");
 
                      pageFrames[currentFrame] = pageNumber;
                      pte.frame = currentFrame;
                      currentFrame++;
                   } else {
-                     /**
-                      * if page_frames is full evict one page depending on the nru algorithm.
-                      */
+                     // Run NRU
                      PageTableEntry page_to_evict = null;
                      int done_flag = 0;
 
-                     /**
-                      * when a page fault occurs, the OS inspects all the pages
-                      * and divides them into 4 categories based on the current
-                      * reference and dirty bits.
-                      */
+                     // Divide all the pages into 4 categories if page faults
                      while (done_flag == 0) {
                         for (int p_frame = 0; p_frame < pageFrames.length; p_frame++) {
 
                            PageTableEntry temp_pte = pageTable.get(pageFrames[p_frame]);
 
-                           if (!temp_pte.referenced && !temp_pte.dirty && temp_pte.valid) {
-                              /** GATEGORY 0: not referenced, not modified **/
+                           if (!temp_pte.referenced && !temp_pte.dirty && temp_pte.valid) { // If its this category just
+                                                                                            // swap instantly
+                              // not referenced, not modified
                               pte.frame = temp_pte.frame;
-                              if (temp_pte.dirty) {
-                                 System.out.println(parts[0] + " (page fault – evict dirty)");
-                                 totalWritesToDisk++;
-                              } else {
-                                 System.out.println(parts[0] + " (page fault – evict clean)");
-                              }
+
+                              System.out.println(parts[0] + " (page fault – evict clean)");
+
                               pageFrames[pte.frame] = pte.index;
                               temp_pte.valid = false;
                               temp_pte.dirty = false;
                               temp_pte.referenced = false;
                               temp_pte.frame = -1;
                               pageTable.put(temp_pte.index, temp_pte);
-                              pte.valid = true;
                               pageTable.put(pte.index, pte);
                               done_flag = 1;
                               break;
                            } else {
                               if (!temp_pte.referenced && temp_pte.dirty && temp_pte.valid) {
-                                 /** GATEGORY 1: not referenced, modified **/
+                                 // not referenced, modified
                                  page_to_evict = new PageTableEntry(temp_pte);
                                  continue;
                               } else {
                                  if (temp_pte.referenced && !temp_pte.dirty && temp_pte.valid
                                        && page_to_evict == null) {
-                                    /** GATEGORY 2: referenced, not modified **/
+                                    // referenced, not modified
                                     page_to_evict = new PageTableEntry(temp_pte);
                                     continue;
                                  } else {
                                     if (temp_pte.referenced && temp_pte.dirty && temp_pte.valid
                                           && page_to_evict == null) {
-                                       /** GATEGORY 3: referenced, modified **/
+                                       // referenced, modified
                                        page_to_evict = new PageTableEntry(temp_pte);
                                        continue;
                                     }
@@ -756,95 +710,76 @@ public class Simulate {
                         } else {
                            System.out.println(parts[0] + " (page fault – evict clean)");
                         }
-                        /**
-                         * evict/swap out page.
-                         */
+                        // Swap the chosen page
                         pageFrames[pte.frame] = pte.index;
                         page_to_evict.valid = false;
                         page_to_evict.dirty = false;
                         page_to_evict.frame = -1;
                         page_to_evict.referenced = false;
                         pageTable.put(page_to_evict.index, page_to_evict);
-                        pte.valid = true;
                         pageTable.put(pte.index, pte);
                         done_flag = 1;
                      }
                   }
+
+               } else {
+                  System.out.println("HIT");
                }
-            } else {
-               System.out.println("HIT");
-               pte.referenced = true;
             }
-
-            if (accessType == 'S') {
-               pte.dirty = true;
-               pte.valid = true;
-            }
-
-            if (instructionType == 'L') {
+            if (instructionType == 'S') {
+               pte.dirty = true;// Store so dirty
                if (!pte.valid) {
                   totalPageFaults++;
                   pte.valid = true;
-                  if (currentFrame < nFrames) {
-                     /**
-                      * if (page frames is not full) swap in current page.
-                      */
+
+                  if (currentFrame < nFrames) {// if we have room
+
                      System.out.println("(page fault – no eviction)");
 
                      pageFrames[currentFrame] = pageNumber;
                      pte.frame = currentFrame;
                      currentFrame++;
                   } else {
-                     /**
-                      * if page_frames is full evict one page depending on the nru algorithm.
-                      */
+                     // Nru algo
                      PageTableEntry page_to_evict = null;
                      int done_flag = 0;
 
-                     /**
-                      * when a page fault occurs, the OS inspects all the pages
-                      * and divides them into 4 categories based on the current
-                      * reference and dirty bits.
-                      */
+                     // Categorize all the pte
                      while (done_flag == 0) {
                         for (int p_frame = 0; p_frame < pageFrames.length; p_frame++) {
 
                            PageTableEntry temp_pte = pageTable.get(pageFrames[p_frame]);
 
                            if (!temp_pte.referenced && !temp_pte.dirty && temp_pte.valid) {
-                              /** GATEGORY 0: not referenced, not modified **/
+                              // not referenced, not modified
                               pte.frame = temp_pte.frame;
-                              if (temp_pte.dirty) {
-                                 System.out.println(parts[0] + " (page fault – evict dirty)");
-                                 totalWritesToDisk++;
-                              } else {
-                                 System.out.println(parts[0] + " (page fault – evict clean)");
-                              }
+
+                              System.out.println(parts[0] + " (page fault – evict clean)");
+
                               pageFrames[pte.frame] = pte.index;
                               temp_pte.valid = false;
                               temp_pte.dirty = false;
                               temp_pte.referenced = false;
                               temp_pte.frame = -1;
                               pageTable.put(temp_pte.index, temp_pte);
-                              pte.valid = true;
                               pageTable.put(pte.index, pte);
                               done_flag = 1;
                               break;
                            } else {
                               if (!temp_pte.referenced && temp_pte.dirty && temp_pte.valid) {
-                                 /** GATEGORY 1: not referenced, modified **/
+                                 // not referenced, modified
                                  page_to_evict = new PageTableEntry(temp_pte);
                                  continue;
                               } else {
                                  if (temp_pte.referenced && !temp_pte.dirty && temp_pte.valid
                                        && page_to_evict == null) {
-                                    /** GATEGORY 2: referenced, not modified **/
+                                    // referenced, not modified
                                     page_to_evict = new PageTableEntry(temp_pte);
                                     continue;
                                  } else {
                                     if (temp_pte.referenced && temp_pte.dirty && temp_pte.valid
                                           && page_to_evict == null) {
-                                       /** GATEGORY 3: referenced, modified **/
+                                       // referenced, modified
                                        page_to_evict = new PageTableEntry(temp_pte);
                                        continue;
                                     }
@@ -860,66 +795,51 @@ public class Simulate {
                         pte.frame = page_to_evict.frame;
 
                         if (page_to_evict.dirty) {
-                           /**
-                            * If (swapped out page is dirty) increment the write to disk number;
-                            */
+
                            System.out.println(parts[0] + " (page fault – evict dirty)");
                            totalWritesToDisk++;
                         } else {
                            System.out.println(parts[0] + " (page fault – evict clean)");
                         }
-                        /**
-                         * evict/swap out page.
-                         */
+                        // swap
                         pageFrames[pte.frame] = pte.index;
                         page_to_evict.valid = false;
                         page_to_evict.dirty = false;
                         page_to_evict.frame = -1;
                         page_to_evict.referenced = false;
                         pageTable.put(page_to_evict.index, page_to_evict);
-                        pte.valid = true;
                         pageTable.put(pte.index, pte);
                         done_flag = 1;
                      }
                   }
-               }
-            } else {
-               System.out.println("HIT");
-               pte.referenced = true;
-            }
 
-            if (instructionType == 'M') {
+               } else {
+                  System.out.println("HIT");
+               }
+            }
+            if (accessType == 'L') {// Same thing as I
                if (!pte.valid) {
                   totalPageFaults++;
                   pte.valid = true;
                   if (currentFrame < nFrames) {
-                     /**
-                      * if (page frames is not full) swap in current page.
-                      */
+
                      System.out.println("(page fault – no eviction)");
 
                      pageFrames[currentFrame] = pageNumber;
                      pte.frame = currentFrame;
                      currentFrame++;
                   } else {
-                     /**
-                      * if page_frames is full evict one page depending on the nru algorithm.
-                      */
+
                      PageTableEntry page_to_evict = null;
                      int done_flag = 0;
 
-                     /**
-                      * when a page fault occurs, the OS inspects all the pages
-                      * and divides them into 4 categories based on the current
-                      * reference and dirty bits.
-                      */
                      while (done_flag == 0) {
                         for (int p_frame = 0; p_frame < pageFrames.length; p_frame++) {
 
                            PageTableEntry temp_pte = pageTable.get(pageFrames[p_frame]);
 
                            if (!temp_pte.referenced && !temp_pte.dirty && temp_pte.valid) {
-                              /** GATEGORY 0: not referenced, not modified **/
+                              // not referenced, not modified
                               pte.frame = temp_pte.frame;
                               if (temp_pte.dirty) {
                                  System.out.println(parts[0] + " (page fault – evict dirty)");
@@ -933,25 +853,24 @@ public class Simulate {
                               temp_pte.referenced = false;
                               temp_pte.frame = -1;
                               pageTable.put(temp_pte.index, temp_pte);
-                              pte.valid = true;
                               pageTable.put(pte.index, pte);
                               done_flag = 1;
                               break;
                            } else {
                               if (!temp_pte.referenced && temp_pte.dirty && temp_pte.valid) {
-                                 /** GATEGORY 1: not referenced, modified **/
+                                 // not referenced, modified
                                  page_to_evict = new PageTableEntry(temp_pte);
                                  continue;
                               } else {
                                  if (temp_pte.referenced && !temp_pte.dirty && temp_pte.valid
                                        && page_to_evict == null) {
-                                    /** GATEGORY 2: referenced, not modified **/
+                                    // referenced, not modified
                                     page_to_evict = new PageTableEntry(temp_pte);
                                     continue;
                                  } else {
                                     if (temp_pte.referenced && temp_pte.dirty && temp_pte.valid
                                           && page_to_evict == null) {
-                                       /** GATEGORY 3: referenced, modified **/
+                                       // referenced, modified
                                        page_to_evict = new PageTableEntry(temp_pte);
                                        continue;
                                     }
@@ -967,54 +886,134 @@ public class Simulate {
                         pte.frame = page_to_evict.frame;
 
                         if (page_to_evict.dirty) {
-                           /**
-                            * If (swapped out page is dirty) increment the write to disk number;
-                            */
+
                            System.out.println(parts[0] + " (page fault – evict dirty)");
                            totalWritesToDisk++;
                         } else {
                            System.out.println(parts[0] + " (page fault – evict clean)");
                         }
-                        /**
-                         * evict/swap out page.
-                         */
+                        // swap
                         pageFrames[pte.frame] = pte.index;
                         page_to_evict.valid = false;
                         page_to_evict.dirty = false;
                         page_to_evict.frame = -1;
                         page_to_evict.referenced = false;
                         pageTable.put(page_to_evict.index, page_to_evict);
-                        pte.valid = true;
+                        pageTable.put(pte.index, pte);
+                        done_flag = 1;
+                     }
+                  }
+
+               } else {
+                  System.out.println("HIT");
+               }
+            }
+            if (accessType == 'M') { // L then S
+               // Load
+               if (!pte.valid) {
+                  totalPageFaults++;
+                  pte.valid = true;
+                  if (currentFrame < nFrames) {
+
+                     System.out.println("(page fault – no eviction)");
+
+                     pageFrames[currentFrame] = pageNumber;
+                     pte.frame = currentFrame;
+                     currentFrame++;
+                  } else {
+
+                     PageTableEntry page_to_evict = null;
+                     int done_flag = 0;
+
+                     while (done_flag == 0) {
+                        for (int p_frame = 0; p_frame < pageFrames.length; p_frame++) {
+
+                           PageTableEntry temp_pte = pageTable.get(pageFrames[p_frame]);
+
+                           if (!temp_pte.referenced && !temp_pte.dirty && temp_pte.valid) {
+                              // not referenced, not modified
+                              pte.frame = temp_pte.frame;
+                              if (temp_pte.dirty) {
+                                 System.out.println(parts[0] + " (page fault – evict dirty)");
+                                 totalWritesToDisk++;
+                              } else {
+                                 System.out.println(parts[0] + " (page fault – evict clean)");
+                              }
+                              pageFrames[pte.frame] = pte.index;
+                              temp_pte.valid = false;
+                              temp_pte.dirty = false;
+                              temp_pte.referenced = false;
+                              temp_pte.frame = -1;
+                              pageTable.put(temp_pte.index, temp_pte);
+                              pageTable.put(pte.index, pte);
+                              done_flag = 1;
+                              break;
+                           } else {
+                              if (!temp_pte.referenced && temp_pte.dirty && temp_pte.valid) {
+                                 // not referenced, modified
+                                 page_to_evict = new PageTableEntry(temp_pte);
+                                 continue;
+                              } else {
+                                 if (temp_pte.referenced && !temp_pte.dirty && temp_pte.valid
+                                       && page_to_evict == null) {
+                                    // referenced, not modified
+                                    page_to_evict = new PageTableEntry(temp_pte);
+                                    continue;
+                                 } else {
+                                    if (temp_pte.referenced && temp_pte.dirty && temp_pte.valid
+                                          && page_to_evict == null) {
+                                       // referenced, modified
+                                       page_to_evict = new PageTableEntry(temp_pte);
+                                       continue;
+                                    }
+                                 }
+                              }
+                           }
+                        }
+
+                        if (done_flag == 1) {
+                           continue;
+                        }
+
+                        pte.frame = page_to_evict.frame;
+
+                        if (page_to_evict.dirty) {
+
+                           System.out.println(parts[0] + " (page fault – evict dirty)");
+                           totalWritesToDisk++;
+                        } else {
+                           System.out.println(parts[0] + " (page fault – evict clean)");
+                        }
+                        // Swap
+                        pageFrames[pte.frame] = pte.index;
+                        page_to_evict.valid = false;
+                        page_to_evict.dirty = false;
+                        page_to_evict.frame = -1;
+                        page_to_evict.referenced = false;
+                        pageTable.put(page_to_evict.index, page_to_evict);
                         pageTable.put(pte.index, pte);
                         done_flag = 1;
                      }
                   }
                } else {
                   System.out.println("HIT");
-                  pte.referenced = true;
                }
+               //Store
                pte.dirty = true;
                pte.valid = true;
+               totalMemAccesses++;
             }
             pageTable.put(pageNumber, pte);
             totalMemAccesses++;
 
          }
-         printStatistics("NRU", nFrames, totalMemAccesses, totalPageFaults, totalWritesToDisk);
+         System.out.println("Algorithm: NRU");
+         System.out.println("Number of frames:\t" + nFrames);
+         System.out.println("Total memory accesses:\t" + totalMemAccesses);
+         System.out.println("Total page faults:\t" + totalPageFaults);
+         System.out.println("Total writes to disk:\t" + totalWritesToDisk);
       } catch (Exception e) {
          e.printStackTrace();
       }
-   }
-
-   /**
-    * Print statistics.
-    */
-   private static void printStatistics(String alg, int nFrames, int total_mem_accesses, int total_page_faults,
-         int total_writes_to_disk) {
-      System.out.println("Algorithm: " + alg);
-      System.out.println("Number of frames:\t" + nFrames);
-      System.out.println("Total memory accesses:\t" + total_mem_accesses);
-      System.out.println("Total page faults:\t" + total_page_faults);
-      System.out.println("Total writes to disk:\t" + total_writes_to_disk);
    }
 }

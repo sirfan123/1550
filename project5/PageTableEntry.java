@@ -3,7 +3,7 @@
 public class PageTableEntry {
 
     int index;
-    int frame; //Cant we delete index and frame and just do frame#
+    int frame; 
     boolean valid;
     boolean dirty;
     boolean referenced;
